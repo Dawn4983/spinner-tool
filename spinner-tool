@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>幸运转盘 · 带速度调节与跳过</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background:linear-gradient(145deg,#eef3fb 0%,#dfe9f5 100%);
+  min-height:100vh;color:#1e2e44;padding:18px 12px 36px;
+}
+
+/* ===== 顶部标题 ===== */
+.page-header{text-align:center;margin-bottom:20px;}
+.page-header h1{
+  font-size:1.55rem;font-weight:800;letter-spacing:1px;
+  background:linear-gradient(135deg,#1e3a5f,#4b7bb5);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.page-header p{font-size:.8rem;color:#7c93ae;margin-top:5px;}
+
+/* ===== 布局 ===== */
+.app{max-width:980px;margin:0 auto;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;}
+
+/* ===== 转盘面板 ===== */
+.wheel-panel{
+  flex:1 1 380px;min-width:290px;display:flex;flex-direction:column;align-items:center;
+  background:rgba(255,255,255,.65);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-radius:32px;padding:22px 16px 26px;
+  box-shadow:0 24px 50px -22px rgba(30,60,100,.35),inset 0 0 0 1px rgba(255,255,255,.75);
+}
+.wheel-title{
+  font-size:1.25rem;font-weight:800;color:#2d4b7c;margin-bottom:14px;text-align:center;
+  word-break:break-all;max-width:100%;letter-spacing:.5px;
+  text-shadow:0 2px 4px rgba(45,75,124,.08);
+}
+.canvas-wrap{position:relative;width:100%;display:flex;justify-content:center;}
+canvas{display:block;touch-action:manipulation;}
+
+/* ===== 按钮 ===== */
+.spin-btn{
+  margin-top:20px;width:78%;max-width:280px;padding:17px 0;border:none;border-radius:22px;
+  font-size:1.15rem;font-weight:800;letter-spacing:3px;color:#fff;cursor:pointer;
+  background:linear-gradient(135deg,#ff7b54,#e63946);
+  box-shadow:0 12px 26px -10px rgba(230,57,70,.6),inset 0 1px 0 rgba(255,255,255,.3);
+  transition:transform .18s ease,box-shadow .25s ease,filter .2s;user-select:none;
+}
+.spin-btn:hover:not(:disabled){transform:translateY(-3px);box-shadow:0 18px 32px -10px rgba(230,57,70,.7);filter:brightness(1.05);}
+.spin-btn:active:not(:disabled){transform:scale(.96);}
+.spin-btn:disabled{filter:grayscale(.5) brightness(.95);cursor:not-allowed;}
+
+.skip-btn{
+  margin-top:11px;width:60%;max-width:220px;padding:11px 0;border:2px solid #d8e3f0;border-radius:16px;
+  font-size:.9rem;font-weight:700;letter-spacing:1px;color:#5b6f88;background:rgba(255,255,255,.7);
+  cursor:pointer;transition:all .18s;user-select:none;
+}
+.skip-btn:hover{background:#fff;border-color:#4b7bb5;color:#2d4b7c;}
+.skip-btn:active{transform:scale(.96);}
+
+/* ===== 设置面板 ===== */
+.settings-panel{
+  flex:1 1 340px;min-width:290px;background:rgba(255,255,255,.72);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-radius:32px;padding:24px 20px 28px;
+  box-shadow:0 24px 50px -22px rgba(30,60,100,.3),inset 0 0 0 1px rgba(255,255,255,.75);
+}
+.settings-panel h2{
+  font-size:1.02rem;font-weight:800;color:#2d4b7c;margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+}
+.settings-panel h2::before{
+  content:'';width:4px;height:17px;border-radius:4px;
+  background:linear-gradient(180deg,#4b7bb5,#2d4b7c);
+}
+.field-label{
+  display:block;font-size:.82rem;font-weight:700;color:#5b6f88;margin-bottom:8px;letter-spacing:.3px;
+}
+.text-input{
+  width:100%;padding:13px 16px;border-radius:16px;border:2px solid #d8e3f0;
+  font-size:1rem;font-family:inherit;color:#1e2e44;background:#fff;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+.text-input:focus{border-color:#4b7bb5;box-shadow:0 0 0 4px rgba(75,123,181,.12);}
+.field-group{margin-bottom:20px;}
+
+/* 数量调节 */
+.count-row{display:flex;align-items:center;gap:10px;}
+.count-btn{
+  width:48px;height:48px;flex-shrink:0;border:none;border-radius:16px;font-size:1.5rem;font-weight:700;
+  color:#2d4b7c;background:#e9f0f8;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .18s,transform .12s;user-select:none;
+}
+.count-btn:hover{background:#d5e3f2;}
+.count-btn:active{transform:scale(.92);}
+.count-input{
+  flex:1;text-align:center;padding:13px 8px;border-radius:16px;border:2px solid #d8e3f0;
+  font-size:1.1rem;font-weight:700;color:#2d4b7c;font-family:inherit;outline:none;background:#fff;
+  -moz-appearance:textfield;
+}
+.count-input::-webkit-outer-spin-button,.count-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.count-input:focus{border-color:#4b7bb5;box-shadow:0 0 0 4px rgba(75,123,181,.12);}
+
+/* 速度滑块 */
+.speed-row{display:flex;align-items:center;gap:12px;}
+.speed-slider{
+  flex:1;-webkit-appearance:none;appearance:none;height:8px;border-radius:8px;
+  background:linear-gradient(90deg,#b8d0ea,#4b7bb5);outline:none;cursor:pointer;
+}
+.speed-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:24px;height:24px;border-radius:50%;
+  background:linear-gradient(135deg,#4b7bb5,#2d4b7c);cursor:pointer;
+  box-shadow:0 3px 10px rgba(45,75,124,.4),inset 0 1px 0 rgba(255,255,255,.4);
+  transition:transform .15s;
+}
+.speed-slider::-webkit-slider-thumb:hover{transform:scale(1.15);}
+.speed-slider::-moz-range-thumb{
+  width:24px;height:24px;border-radius:50%;border:none;
+  background:linear-gradient(135deg,#4b7bb5,#2d4b7c);cursor:pointer;
+  box-shadow:0 3px 10px rgba(45,75,124,.4);
+}
+.speed-value{
+  min-width:56px;text-align:center;font-size:.85rem;font-weight:800;color:#2d4b7c;
+  background:#e9f0f8;padding:6px 10px;border-radius:12px;
+}
+
+/* 格子名称列表 */
+.items-list{
+  display:flex;flex-direction:column;gap:9px;max-height:300px;overflow-y:auto;padding-right:4px;
+}
+.items-list::-webkit-scrollbar{width:6px;}
+.items-list::-webkit-scrollbar-thumb{background:#c8d8ea;border-radius:6px;}
+.item-row{display:flex;align-items:center;gap:10px;}
+.item-dot{
+  width:14px;height:14px;border-radius:50%;flex-shrink:0;
+  box-shadow:0 2px 6px rgba(0,0,0,.15);
+}
+.item-row input{
+  flex:1;min-width:0;padding:10px 14px;border-radius:13px;border:2px solid #e0e9f4;
+  font-size:.92rem;font-family:inherit;color:#1e2e44;background:#fff;outline:none;
+  transition:border-color .18s,box-shadow .18s;
+}
+.item-row input:focus{border-color:#4b7bb5;box-shadow:0 0 0 3px rgba(75,123,181,.1);}
+
+/* ===== 结果弹窗 ===== */
+.result-overlay{
+  position:fixed;inset:0;background:rgba(18,32,52,.55);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:24px;
+  opacity:0;pointer-events:none;transition:opacity .32s ease;z-index:1000;
+}
+.result-overlay.show{opacity:1;pointer-events:auto;}
+.result-card{
+  background:#fff;border-radius:32px;padding:36px 42px 28px;text-align:center;
+  max-width:92vw;min-width:260px;
+  box-shadow:0 40px 70px -20px rgba(0,15,35,.5),inset 0 0 0 1px rgba(255,255,255,.8);
+  transform:scale(.82) translateY(14px);
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+.result-overlay.show .result-card{transform:scale(1) translateY(0);}
+.result-label{font-size:.88rem;font-weight:700;color:#9aadc4;letter-spacing:2px;margin-bottom:14px;}
+.result-text{
+  font-size:2rem;font-weight:800;word-break:break-all;line-height:1.3;margin-bottom:24px;
+  background:linear-gradient(135deg,#2d4b7c,#4b7bb5);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.result-close{
+  padding:13px 48px;border:none;border-radius:18px;font-size:1rem;font-weight:700;
+  letter-spacing:1px;color:#fff;cursor:pointer;
+  background:linear-gradient(135deg,#4b7bb5,#2d4b7c);
+  box-shadow:0 10px 22px -10px rgba(45,75,124,.6);
+  transition:transform .16s,box-shadow .2s;
+}
+.result-close:hover{transform:translateY(-2px);box-shadow:0 16px 28px -10px rgba(45,75,124,.7);}
+.result-close:active{transform:scale(.96);}
+
+/* ===== 响应式 ===== */
+@media (max-width:720px){
+  body{padding:12px 8px 26px;}
+  .app{gap:14px;}
+  .wheel-panel,.settings-panel{border-radius:26px;padding:16px 12px 20px;min-width:0;flex:1 1 100%;}
+  .page-header h1{font-size:1.3rem;}
+  .wheel-title{font-size:1.1rem;}
+  .spin-btn{width:88%;padding:15px 0;font-size:1.05rem;}
+  .skip-btn{width:70%;}
+  .result-card{padding:28px 24px 22px;}
+  .result-text{font-size:1.6rem;}
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>🎡 幸运转盘</h1>
+  <p>自定义转盘 · 调节速度 · 可跳过动画</p>
+</div>
+
+<div class="app">
+  <!-- ===== 转盘 ===== -->
+  <div class="wheel-panel">
+    <div class="wheel-title" id="wheelTitle">幸运转盘</div>
+    <div class="canvas-wrap">
+      <canvas id="wheelCanvas"></canvas>
+    </div>
+    <button class="spin-btn" id="spinBtn">开 始</button>
+    <button class="skip-btn" id="skipBtn" style="display:none;">⏭ 跳过动画</button>
+  </div>
+
+  <!-- ===== 设置 ===== -->
+  <div class="settings-panel">
+    <h2>转盘设置</h2>
+
+    <div class="field-group">
+      <label class="field-label">转盘名称</label>
+      <input type="text" class="text-input" id="wheelNameInput" value="幸运转盘" maxlength="14" placeholder="输入转盘名称">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">格子数量</label>
+      <div class="count-row">
+        <button class="count-btn" id="minusBtn">−</button>
+        <input type="number" class="count-input" id="countInput" value="6" min="2" max="20">
+        <button class="count-btn" id="plusBtn">+</button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">转动速度</label>
+      <div class="speed-row">
+        <input type="range" class="speed-slider" id="speedSlider" min="1" max="6" step="1" value="3">
+        <span class="speed-value" id="speedValue">正常</span>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">格子名称</label>
+      <div class="items-list" id="itemsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 结果弹窗 ===== -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card">
+    <div class="result-label">🎉 抽 中</div>
+    <div class="result-text" id="resultText">—</div>
+    <button class="result-close" id="resultClose">确 定</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   速度配置
+   ============================================================ */
+const SPEED_LEVELS = [
+  { name: '很慢', duration: 7500, turns: [6, 8] },
+  { name: '慢',   duration: 5800, turns: [5, 7] },
+  { name: '正常', duration: 4200, turns: [4, 6] },
+  { name: '快',   duration: 2900, turns: [4, 5] },
+  { name: '很快', duration: 1800, turns: [3, 4] },
+  { name: '极速', duration: 1000, turns: [2, 3] }
+];
+
+/* ============================================================
+   状态
+   ============================================================ */
+let items = ['选项 A', '选项 B', '选项 C', '选项 D', '选项 E', '选项 F'];
+let wheelName = '幸运转盘';
+let rotation = 0;
+let spinning = false;
+let canvasSize = 400;
+let animId = null;
+let spinState = null;   // 当前旋转动画的状态对象
+
+const canvas = document.getElementById('wheelCanvas');
+const ctx = canvas.getContext('2d');
+
+const wheelTitleEl   = document.getElementById('wheelTitle');
+const wheelNameInput = document.getElementById('wheelNameInput');
+const countInput     = document.getElementById('countInput');
+const itemsList      = document.getElementById('itemsList');
+const spinBtn        = document.getElementById('spinBtn');
+const skipBtn        = document.getElementById('skipBtn');
+const speedSlider    = document.getElementById('speedSlider');
+const speedValue     = document.getElementById('speedValue');
+const resultOverlay  = document.getElementById('resultOverlay');
+const resultText     = document.getElementById('resultText');
+
+/* ============================================================
+   工具函数
+   ============================================================ */
+function sectorColor(i) {
+  return `hsl(${(i * 137.508) % 360}, 68%, 55%)`;
+}
+
+/* ============================================================
+   画布尺寸
+   ============================================================ */
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  const available = wrap.clientWidth;
+  const maxHeight = Math.min(window.innerHeight * 0.54, 520);
+  const size = Math.max(230, Math.min(available, maxHeight, 520));
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(size * dpr);
+  canvas.height = Math.round(size * dpr);
+  canvas.style.width  = size + 'px';
+  canvas.style.height = size + 'px';
+
+  canvasSize = size;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+/* ============================================================
+   绘制转盘
+   ============================================================ */
+function draw() {
+  const size = canvasSize;
+  const cx = size / 2;
+  const cy = size / 2;
+  const R  = size / 2 - 12;      // 外盘半径
+  const r  = R - 22;             // 扇形半径
+  const n  = items.length;
+
+  ctx.clearRect(0, 0, size, size);
+  if (n === 0) return;
+
+  const sectorAngle = (Math.PI * 2) / n;
+
+  /* ---- 白色外盘 + 阴影 ---- */
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(30,60,100,.22)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 8;
+  ctx.fill();
+  ctx.restore();
+
+  /* ---- 扇形色块 ---- */
+  for (let i = 0; i < n; i++) {
+    const start = i * sectorAngle + rotation;
+    const end   = start + sectorAngle;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = sectorColor(i);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  /* ---- 文字 ---- */
+  for (let i = 0; i < n; i++) {
+    const start = i * sectorAngle + rotation;
+    const mid   = start + sectorAngle / 2;
+    const label = items[i] || '';
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(mid);
+
+    let fontSize = Math.min(size / 26, 20);
+    if (n > 8)  fontSize *= 0.85;
+    if (n > 12) fontSize *= 0.82;
+    if (n > 16) fontSize *= 0.82;
+    fontSize = Math.max(9, fontSize);
+
+    ctx.font = `700 ${fontSize}px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,.3)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 1;
+
+    let text = label;
+    const maxW = r * 0.66;
+    while (ctx.measureText(text).width > maxW && text.length > 1) {
+      text = text.slice(0, -1);
+    }
+    if (text !== label && text.length > 1) {
+      text = text.slice(0, -1) + '…';
+    }
+
+    const norm = ((mid % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const isLeft = norm > Math.PI / 2 && norm < Math.PI * 1.5;
+
+    if (isLeft) {
+      ctx.rotate(Math.PI);
+      ctx.textAlign = 'left';
+      ctx.fillText(text, -(r - 22), 0);
+    } else {
+      ctx.textAlign = 'right';
+      ctx.fillText(text, r - 22, 0);
+    }
+    ctx.restore();
+  }
+
+  /* ---- 外圈装饰灯珠 ---- */
+  const ringR = (r + R) / 2;
+  const dotCount = Math.max(16, n * 3);
+  for (let i = 0; i < dotCount; i++) {
+    const a  = (i / dotCount) * Math.PI * 2 - Math.PI / 2;
+    const dx = cx + Math.cos(a) * ringR;
+    const dy = cy + Math.sin(a) * ringR;
+    ctx.beginPath();
+    ctx.arc(dx, dy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 === 0 ? '#ffd166' : '#4b7bb5';
+    ctx.fill();
+  }
+
+  /* ---- 中心圆 ---- */
+  const centerR = Math.max(20, size * 0.072);
+  ctx.beginPath();
+  ctx.arc(cx, cy, centerR, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(30,60,100,.25)';
+  ctx.shadowBlur = 14;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(45,75,124,.12)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  /* ---- 顶部指针 ---- */
+  const pw   = Math.max(9, size * 0.038);
+  const tipY = cy - r + 14;
+  const baseY = cy - r - 16;
+
+  ctx.beginPath();
+  ctx.moveTo(cx, tipY);
+  ctx.lineTo(cx - pw, baseY);
+  ctx.lineTo(cx + pw, baseY);
+  ctx.closePath();
+  ctx.fillStyle = '#e63946';
+  ctx.shadowColor = 'rgba(230,57,70,.5)';
+  ctx.shadowBlur = 12;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx, tipY - 4);
+  ctx.lineTo(cx - pw * 0.45, baseY + 3);
+  ctx.lineTo(cx + pw * 0.45, baseY + 3);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.fill();
+}
+
+/* ============================================================
+   格子名称列表
+   ============================================================ */
+function renderItems() {
+  itemsList.innerHTML = '';
+  items.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+
+    const dot = document.createElement('span');
+    dot.className = 'item-dot';
+    dot.style.background = sectorColor(i);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = item;
+    input.maxLength = 20;
+    input.placeholder = `选项 ${i + 1}`;
+    input.addEventListener('input', () => {
+      items[i] = input.value;
+      draw();
+    });
+
+    row.appendChild(dot);
+    row.appendChild(input);
+    itemsList.appendChild(row);
+  });
+}
+
+/* ============================================================
+   设置格子数量
+   ============================================================ */
+function setCount(n) {
+  n = Math.max(2, Math.min(20, Math.round(n) || 2));
+  countInput.value = n;
+
+  const old = items.slice();
+  const next = [];
+  for (let i = 0; i < n; i++) {
+    next.push(old[i] !== undefined && old[i] !== '' ? old[i] : `选项 ${i + 1}`);
+  }
+  items = next;
+
+  // 让第 0 个格子顶部居中
+  const sectorAngle = (Math.PI * 2) / n;
+  rotation = -Math.PI / 2 - sectorAngle / 2;
+
+  renderItems();
+  draw();
+}
+
+/* ============================================================
+   旋转
+   ============================================================ */
+function spin() {
+  if (spinning || items.length < 2) return;
+
+  spinning = true;
+  spinBtn.disabled = true;
+  spinBtn.textContent = '转动中…';
+  skipBtn.style.display = 'block';
+  hideResult();
+
+  const n = items.length;
+  const sectorAngle = (Math.PI * 2) / n;
+
+  // 随机选中一个格子
+  const targetIndex = Math.floor(Math.random() * n);
+  const jitter = (Math.random() - 0.5) * sectorAngle * 0.6;
+  const targetMid = targetIndex * sectorAngle + sectorAngle / 2 + jitter;
+
+  // 计算最终旋转角度，让 targetMid 对准顶部指针（-π/2）
+  let delta = (-Math.PI / 2 - targetMid - rotation) % (Math.PI * 2);
+  if (delta < 0) delta += Math.PI * 2;
+
+  // 根据速度档位添加额外圈数
+  const speed = SPEED_LEVELS[speedSlider.value - 1];
+  const extraTurns = speed.turns[0] + Math.floor(Math.random() * (speed.turns[1] - speed.turns[0] + 1));
+  delta += extraTurns * Math.PI * 2;
+
+  spinState = {
+    startRot: rotation,
+    totalDelta: delta,
+    duration: speed.duration,
+    t0: performance.now(),
+    targetIndex: targetIndex,
+    finished: false
+  };
+
+  animId = requestAnimationFrame(frame);
+}
+
+function frame(now) {
+  if (!spinState || spinState.finished) return;
+
+  const p = Math.min((now - spinState.t0) / spinState.duration, 1);
+  const eased = 1 - Math.pow(1 - p, 4);   // easeOutQuart
+
+  rotation = spinState.startRot + spinState.totalDelta * eased;
+  draw();
+
+  if (p < 1) {
+    animId = requestAnimationFrame(frame);
+  } else {
+    finishSpin();
+  }
+}
+
+function finishSpin() {
+  if (!spinState || spinState.finished) return;
+  spinState.finished = true;
+
+  if (animId) {
+    cancelAnimationFrame(animId);
+    animId = null;
+  }
+
+  // 定格到最终角度
+  rotation = (spinState.startRot + spinState.totalDelta) % (Math.PI * 2);
+  draw();
+
+  const targetIndex = spinState.targetIndex;
+  spinning = false;
+  spinBtn.disabled = false;
+  spinBtn.textContent = '开 始';
+  skipBtn.style.display = 'none';
+
+  showResult(items[targetIndex] || '—');
+  spinState = null;
+}
+
+function skipSpin() {
+  if (!spinning || !spinState) return;
+  finishSpin();
+}
+
+/* ============================================================
+   结果弹窗
+   ============================================================ */
+function showResult(text) {
+  resultText.textContent = text;
+  resultOverlay.classList.add('show');
+}
+function hideResult() {
+  resultOverlay.classList.remove('show');
+}
+
+/* ============================================================
+   事件绑定
+   ============================================================ */
+spinBtn.addEventListener('click', spin);
+skipBtn.addEventListener('click', skipSpin);
+
+resultClose.addEventListener('click', hideResult);
+resultOverlay.addEventListener('click', (e) => {
+  if (e.target === resultOverlay) hideResult();
+});
+
+wheelNameInput.addEventListener('input', () => {
+  wheelName = wheelNameInput.value || '幸运转盘';
+  wheelTitleEl.textContent = wheelName;
+});
+
+document.getElementById('minusBtn').addEventListener('click', () => {
+  setCount(parseInt(countInput.value, 10) - 1);
+});
+document.getElementById('plusBtn').addEventListener('click', () => {
+  setCount(parseInt(countInput.value, 10) + 1);
+});
+countInput.addEventListener('change', () => {
+  setCount(parseInt(countInput.value, 10));
+});
+
+/* ---- 速度滑块 ---- */
+speedSlider.addEventListener('input', () => {
+  const s = SPEED_LEVELS[speedSlider.value - 1];
+  speedValue.textContent = s.name;
+});
+
+/* 键盘快捷键 */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !spinning) {
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    spin();
+  }
+  if (e.key === 'Escape') hideResult();
+  if (e.key === ' ' && spinning) {   // 空格跳过
+    e.preventDefault();
+    skipSpin();
+  }
+});
+
+/* 窗口变化 */
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(resizeCanvas, 120);
+});
+
+/* ============================================================
+   初始化
+   ============================================================ */
+function init() {
+  setCount(6);
+  wheelTitleEl.textContent = wheelName;
+  speedValue.textContent = SPEED_LEVELS[speedSlider.value - 1].name;
+  resizeCanvas();
+}
+init();
+</script>
+</body>
+</html>
